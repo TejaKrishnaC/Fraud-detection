@@ -1,0 +1,133 @@
+import speech_recognition as sr
+import pyttsx3
+import tkinter as tk
+from deep_translator import GoogleTranslator  # Replace googletrans with deep_translator
+
+# Supported input languages
+input_languages = {
+    "English": "en-US",
+    "Spanish": "es-ES",
+    "French": "fr-FR",
+    "German": "de-DE",
+    "Chinese": "zh-CN"
+}
+
+# Supported output languages (Google Translate language codes)
+output_languages = {
+    "English": "en",
+    "Spanish": "es",
+    "French": "fr",
+    "German": "de",
+    "Chinese": "zh"
+}
+
+# Initialize speech recognition, text-to-speech engines, and translator
+recognizer = sr.Recognizer()
+engine = pyttsx3.init()
+
+# Create the GUI window
+window = tk.Tk()
+window.title("Language Translator")
+
+# Variables to keep track of the currently selected buttons
+selected_input_button = None
+selected_output_button = None
+
+# Function to set the input language and highlight the button
+def set_input_language(language, button):
+    global input_language, selected_input_button
+    input_language = language
+    print(f"Input language set to {language}")
+
+    # Reset previously selected button color
+    if selected_input_button:
+        selected_input_button.config(bg="SystemButtonFace")  # Default color
+
+    # Highlight the selected button
+    button.config(bg="lightblue")
+    selected_input_button = button
+
+# Function to set the output language and highlight the button
+def set_output_language(language, button):
+    global output_language, selected_output_button
+    output_language = language
+    print(f"Output language set to {language}")
+
+    # Reset previously selected button color
+    if selected_output_button:
+        selected_output_button.config(bg="SystemButtonFace")  # Default color
+
+    # Highlight the selected button
+    button.config(bg="lightgreen")
+    selected_output_button = button
+
+# Function to listen to user speech and translate continuously
+def listen_and_translate():
+    while True:  # Continuous loop to keep listening
+        try:
+            with sr.Microphone() as source:
+                recognizer.adjust_for_ambient_noise(source)
+                print("Listening...")
+                audio = recognizer.listen(source)
+
+            # Recognize speech in the input language
+            text = recognizer.recognize_google(audio, language=input_language)
+            print(f"You said: {text}")
+
+            # Translate the recognized text
+            translated_text = translate_text(text, output_language)
+            print(f"Translated text: {translated_text}")
+
+            # Speak translated text
+            engine.say(translated_text)
+            engine.runAndWait()
+
+        except sr.UnknownValueError:
+            print("Sorry, I did not understand that. Please try again.")
+        except sr.RequestError as e:
+            print(f"Error with speech recognition service: {e}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        # The loop will continue listening after any exception or error
+
+# Function to translate text
+def translate_text(text, target_language):
+    translator = GoogleTranslator(source='auto', target=target_language)
+    translated = translator.translate(text)
+    return translated
+
+# Create input and output language selection labels and buttons
+input_label = tk.Label(window, text="Select Input Language:")
+input_label.grid(row=0, column=0)
+
+output_label = tk.Label(window, text="Select Output Language:")
+output_label.grid(row=1, column=0)
+
+input_buttons = {}
+output_buttons = {}
+
+# For input buttons
+for idx, (language, code) in enumerate(input_languages.items()):
+    btn = tk.Button(window, text=language)
+    btn.config(command=lambda lang=code, b=btn: set_input_language(lang, b))
+    btn.grid(row=0, column=1 + idx)
+    input_buttons[language] = btn
+
+# For output buttons
+for idx, (language, code) in enumerate(output_languages.items()):
+    btn = tk.Button(window, text=language)
+    btn.config(command=lambda lang=code, b=btn: set_output_language(lang, b))
+    btn.grid(row=1, column=1 + idx)
+    output_buttons[language] = btn
+
+
+# Set default input and output languages
+input_language = input_languages["English"]
+output_language = output_languages["English"]
+
+# Add a "Start Translation" button
+start_button = tk.Button(window, text="Start Translation", command=listen_and_translate)
+start_button.grid(row=2, column=0, columnspan=2)
+
+# Start the GUI event loop
+window.mainloop()
