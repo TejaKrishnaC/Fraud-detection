@@ -1,0 +1,75 @@
+import cv2
+import pandas as pd
+from ultralytics import YOLO
+import numpy as np
+
+# Load pre-trained YOLOv8 model
+model = YOLO('yolov8n.pt')  # Replace with the path to your YOLOv8 model
+
+def detect_crowds(video_path, output_csv):
+    cap = cv2.VideoCapture(video_path)
+    frame_count = 0
+    crowd_log = []
+
+    # Parameters for crowd detection
+    crowd_threshold = 3
+    proximity_threshold = 50  # Distance in pixels
+    persistence_threshold = 10  # Frames
+
+    crowd_frames = {}
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        frame_count += 1
+        detections = model.predict(frame, stream=True)
+        persons = []
+
+        # Extract bounding boxes for persons
+        for result in detections:
+            for box in result.boxes:
+                if box.cls == 0:  # Class 0 corresponds to 'person' in YOLOv8
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    persons.append(((x1 + x2) // 2, (y1 + y2) // 2))  # Center of bounding box
+
+        # Identify crowds based on proximity
+        crowds = []
+        for i, p1 in enumerate(persons):
+            group = [p1]
+            for j, p2 in enumerate(persons):
+                if i != j and np.linalg.norm(np.array(p1) - np.array(p2)) < proximity_threshold:
+                    group.append(p2)
+            if len(group) >= crowd_threshold:
+                crowds.append(group)
+
+        # Log crowd persistence
+        if crowds:
+            for group in crowds:
+                if frame_count not in crowd_frames:
+                    crowd_frames[frame_count] = len(group)
+
+        # Check for persistence
+        for frame in list(crowd_frames.keys()):
+            if frame_count - frame > persistence_threshold:
+                del crowd_frames[frame]
+
+        # Record crowd events
+        if crowd_frames:
+            for frame, count in crowd_frames.items():
+                crowd_log.append({"Frame Number": frame, "Person Count": count})
+
+    cap.release()
+
+    # Save results to CSV
+    df = pd.DataFrame(crowd_log)
+    df.to_csv(output_csv, index=False)
+    print(f"Crowd detection completed. Results saved to {output_csv}.")
+
+# Input video and output CSV paths
+video_path = "C:\\Users\\RAJ SEKHAR C\\Desktop\\Chat\\dataset_video.mp4"  # Replace with your video path
+output_csv = "crowd_detection_results.csv"
+
+# Run the crowd detection
+detect_crowds(video_path, output_csv)
